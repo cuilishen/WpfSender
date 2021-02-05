@@ -14,6 +14,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using WpfSender.Tools;
 
 namespace WpfSender
 {
@@ -25,37 +26,6 @@ namespace WpfSender
         public MainWindow()
         {
             InitializeComponent();
-        }
-
-
-        public class ImportFromDLL
-        {
-            public const int WM_COPYDATA = 0x004A;
-
-            //启用非托管代码
-            [StructLayout(LayoutKind.Sequential)]
-            public struct COPYDATASTRUCT
-            {
-                public int dwData;    //not used
-                public int cbData;    //长度
-                [MarshalAs(UnmanagedType.LPStr)]
-                public string lpData;
-            }
-
-            [DllImport("User32.dll")]
-            public static extern int SendMessage(
-                IntPtr hWnd,     // handle to destination window 
-                int Msg,         // message
-                IntPtr wParam,    // first message parameter 
-                ref COPYDATASTRUCT pcd // second message parameter 
-            );
-
-            [DllImport("User32.dll", EntryPoint = "FindWindow")]
-            public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
-
-            [DllImport("Kernel32.dll", EntryPoint = "GetConsoleWindow")]
-            public static extern IntPtr GetConsoleWindow();
-
         }
 
         private void SendBtn_Click(object sender, RoutedEventArgs e)
@@ -74,55 +44,54 @@ namespace WpfSender
             //自己的窗口句柄
             IntPtr hwndSendWindow = ImportFromDLL.GetConsoleWindow();
 
-            hwndSendWindow= WHwnd.GetWindowHwndSource(this);
+            hwndSendWindow = WHwnd.GetWindowHwndSource(this);
             if (hwndSendWindow == IntPtr.Zero)
             {
                 Console.WriteLine("获取自己的窗口句柄失败，请重试");
                 return;
             }
 
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < 1; i++)
             {
                 string strText = DateTime.Now.ToString();
+
+                byte[] imagedata = new byte[65536];
+                byte[] data = new byte[65536];
+                Random random = new Random();
+                for (int index = 0; index < imagedata.Length; index++)
+                {
+                    int ccc = random.Next(0, byte.MaxValue);
+                    imagedata[index] = (byte)44;
+                    data[index] = (byte)ccc;
+                }
                 //填充COPYDATA结构
                 ImportFromDLL.COPYDATASTRUCT copydata = new ImportFromDLL.COPYDATASTRUCT();
-                copydata.cbData = Encoding.Default.GetBytes(strText).Length; //长度 注意不要用strText.Length;
-                copydata.lpData = strText;                                   //内容
+                //copydata.cbData = Encoding.Default.GetBytes(strText).Length; //长度 注意不要用strText.Length;
+                //copydata.lpData = strText;                                   //内容
 
-                ImportFromDLL.SendMessage(hwndRecvWindow, ImportFromDLL.WM_COPYDATA, hwndSendWindow, ref copydata);
+                // {
+                ImportFromDLL.COPYDATASTRUCT cds = new ImportFromDLL.COPYDATASTRUCT();
+
+                //cds.dwData = (IntPtr)flag;
+
+                cds.cbData = data.Length;
+
+                cds.lpData = Marshal.AllocHGlobal(data.Length);
+
+                Marshal.Copy(data, 0, cds.lpData, data.Length);
+
+                //SendMessage(WINDOW_HANDLER, WM_COPYDATA, 0, ref cds);
+                // }
+
+                //copydata.cbData = imagedata.Length; //长度 注意不要用strText.Length;
+                //copydata.lpData = imagedata;                                   //内容
+
+                ImportFromDLL.SendMessage(hwndRecvWindow, ImportFromDLL.WM_COPYDATA, hwndSendWindow, ref cds);
 
                 Console.WriteLine(strText);
                 Thread.Sleep(1000);
             }
 
         }
-
-
-        #region 获取自己的窗口句柄
-        
-        #endregion
-        }
-
-
-
-    public class WHwnd
-    {
-        /// <summary>
-        /// 主窗体句柄
-        /// </summary>
-        public static System.Windows.Interop.HwndSource Hwnd;
-        /// <summary>
-        /// 获取窗体句柄
-        /// </summary>
-        /// <param name="window">窗体</param>
-        public static IntPtr GetWindowHwndSource(DependencyObject window, bool isHwnd = true)
-        {
-            var formDependency = System.Windows.Interop.HwndSource.FromDependencyObject(window);
-            System.Windows.Interop.HwndSource winformWindow = (formDependency as System.Windows.Interop.HwndSource);
-            if (isHwnd)
-                Hwnd = winformWindow;
-            return winformWindow.Handle;
-        }
-
     }
 }
